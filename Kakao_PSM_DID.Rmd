@@ -1,0 +1,553 @@
+---
+title: "Kakao_PSM_DID"
+output: pdf_document
+date: "2023-06-09"
+---
+
+## Read Data & Overview
+```{r setup, include=FALSE}
+options(repos = c(CRAN = "https://cran.rstudio.com"))
+kakao <- read.csv("kakao.csv")
+head(kakao)
+str(kakao)
+
+kakao$gender=as.factor(kakao$gender)
+kakao$age=as.factor(kakao$age)
+kakao$education=as.factor(kakao$education)
+kakao$income=as.factor(kakao$income)
+
+library(Matrix)
+library(plm)
+```
+
+
+## Descriptive Stats (1) Control group & treatment group
+```{r}
+# treatment and control group
+table(kakao$tg) # control group >>> treatment group
+
+```
+
+
+## Descriptive Stats (2) Demographic variables
+```{r}
+# demo: 849 users, 2 week panel data
+kakao_demo <- subset(kakao, week == 1) # avoid duplication of users
+
+# age
+table(kakao_demo$age)
+age_100 <- round(prop.table(table(kakao_demo$age))*100, 3)
+age_100
+age_per <- paste0(age_100, "%")
+age_per
+age_legend <- c("7-18 y/o", "19-29 y/o", "30-39 y/o", "40-49 y/o", "50-69 y/o")
+age_color <- c("yellow2", "yellow", "orange", "orange2", "orange3")
+
+pie(prop.table(table(kakao_demo$age)), labels = c(age_per[1], age_per[2], age_per[3], age_per[4], age_per[5]), main = "Age Distribution (%)", col = age_color)
+legend("topright", legend = age_legend, fill = age_color)
+barplot(as.vector(table(kakao_demo$age)), names.arg = age_legend, col = age_color, xlab = "Age Group", ylab = "Num of Users", main = "Age Distribution")
+text(x = 1:length(as.vector(table(kakao_demo$age))), y = as.vector(table(kakao_demo$age)), labels = as.vector(table(kakao_demo$age)), pos = 1, offset = 0.2)
+
+
+# income 
+table(kakao_demo$income)
+income_100 <- round(prop.table(table(kakao_demo$income))*100, 3)
+income_per <- paste0(income_100, "%")
+income_per
+income_legend <- c("< $1k", "$1-3k", "$3-5k", "> $5k")
+income_color <- c("yellow2", "yellow", "orange", "orange3")
+
+pie(prop.table(table(kakao_demo$income)), labels = c(income_per[1], income_per[2], income_per[3], income_per[4]), main = "Income Distribution (%)", col = income_color)
+legend("topright", legend = income_legend, fill = income_color)
+barplot(as.vector(table(kakao_demo$income)), names.arg = income_legend, col = income_color, xlab = "Income Group", ylab = "Num of Users", main = "Income Distribution")
+text(x = 1:length(as.vector(table(kakao_demo$income))), y = as.vector(table(kakao_demo$income)), labels = as.vector(table(kakao_demo$income)), pos = 1, offset = 0.2)
+
+
+# education 
+table(kakao_demo$education)
+edu_100 <- round(prop.table(table(kakao_demo$education))*100, 3)
+edu_per <- paste0(edu_100, "%")
+edu_per
+edu_legend <- c("Elementary, middle/ high school", "High school graduates", "Undergrad/ grads tudents", "College graduates")
+edu_color <- c("yellow2", "yellow", "orange", "orange3")
+
+pie(prop.table(table(kakao_demo$education)), labels = c(edu_per[1], edu_per[2], edu_per[3], edu_per[4]), main = "Education Level Distribution (%)", col = edu_color)
+legend("bottomleft", legend = edu_legend, fill = edu_color, xjust = 0.5, yjust = 50)
+barplot(as.vector(table(kakao_demo$education)), names.arg = edu_legend, col = edu_color, xlab = "Education Level", ylab = "Num of Users", main = "Education Distribution")
+text(x = 1:length(as.vector(table(kakao_demo$education))), y = as.vector(table(kakao_demo$education)), labels = as.vector(table(kakao_demo$education)), pos = 1, offset = 0.2)
+
+
+# gender
+table(kakao_demo$gender)
+gender_100 <- round(prop.table(table(kakao_demo$gender))*100, 3)
+gender_per <- paste0(gender_100, "%")
+gender_per
+gender_legend <- c("Female", "Male")
+gender_color <- c("yellow", "orange")
+
+pie(prop.table(table(kakao_demo$gender)), labels = c(gender_per[1], gender_per[2]), main = "Gender Distribution (%)", col = gender_color)
+legend("topright", legend = gender_legend, fill = gender_color)
+barplot(as.vector(table(kakao_demo$gender)), names.arg = gender_legend, col = gender_color, xlab = "Gender Level", ylab = "Num of Users", main = "Gender Distribution")
+text(x = 1:length(as.vector(table(kakao_demo$gender))), y = as.vector(table(kakao_demo$gender)), labels = as.vector(table(kakao_demo$gender)), pos = 1, offset = 0.2)
+```
+
+
+## Descriptive Stats (3): Demographic variables by control group & treatment group 
+```{r}
+non_adopters <- subset(kakao, tg == 0) # control group 
+adopters <- subset(kakao, tg == 1) # treatment group
+
+non_adopters_w1 <- subset(non_adopters, week == 1)
+non_adopters_w2 <- subset(non_adopters, week == 2)
+adopters_w1 <- subset(adopters, week == 1)
+adopters_w2 <- subset(adopters, week == 2)
+
+
+round(prop.table(table(adopters_w1$age))*100, 3)
+round(prop.table(table(non_adopters_w1$age))*100, 3)
+round(prop.table(table(adopters_w1$income))*100, 3)
+round(prop.table(table(non_adopters_w1$income))*100, 3)
+round(prop.table(table(adopters_w1$education))*100, 3)
+round(prop.table(table(non_adopters_w1$education))*100, 3)
+round(prop.table(table(adopters_w1$gender))*100, 3)
+round(prop.table(table(non_adopters_w1$gender))*100, 3)
+```
+
+
+
+## Descriptive Stats (4): Time variables 
+```{r}
+## kakao_talk
+hist(kakao$t_kakao_talk, breaks = 20)
+mean(non_adopters_w1$t_kakao_talk)
+mean(non_adopters_w2$t_kakao_talk)
+mean(adopters_w1$t_kakao_talk)
+mean(adopters_w2$t_kakao_talk)
+
+library(ggplot2)
+ktalk <- data.frame(Group = c("Non-adopters", "Adopters"), Week1 = c(mean(non_adopters_w1$t_kakao_talk), mean(adopters_w1$t_kakao_talk)), Week2 = c(mean(non_adopters_w2$t_kakao_talk), mean(adopters_w2$t_kakao_talk)))
+ktalk
+ggplot(ktalk, aes(x = Group, y = Week1, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 1",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+ggplot(ktalk, aes(x = Group, y = Week2, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 2",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+
+## kakao_story
+hist(kakao$t_kakao_story, breaks = 20)
+
+kstory <- data.frame(Group = c("Non-adopters", "Adopters"), Week1 = c(mean(non_adopters_w1$t_kakao_story), mean(adopters_w1$t_kakao_story)), Week2 = c(mean(non_adopters_w2$t_kakao_story), mean(adopters_w2$t_kakao_story)))
+kstory
+
+ggplot(kstory, aes(x = Group, y = Week1, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 1",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+ggplot(kstory, aes(x = Group, y = Week2, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 2",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+
+# kakao_game
+hist(kakao_demo$t_kakao_game, breaks = 30) 
+table(kakao_demo$t_kakao_game)
+max(kakao_demo$t_kakao_game)
+kakao_demo
+
+kgame <- data.frame(Group = c("Non-adopters", "Adopters"), Week1 = c(mean(non_adopters_w1$t_kakao_game), mean(adopters_w1$t_kakao_game)), Week2 = c(mean(non_adopters_w2$t_kakao_game), mean(adopters_w2$t_kakao_game)))
+kgame
+
+ggplot(kgame, aes(x = Group, y = Week1, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 1",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+ggplot(kgame, aes(x = Group, y = Week2, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 2",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+
+# non_kakao_talk
+hist(kakao$t_non_kakao_talk, breaks = 20)
+
+nktalk <- data.frame(Group = c("Non-adopters", "Adopters"), Week1 = c(mean(non_adopters_w1$t_non_kakao_talk), mean(adopters_w1$t_non_kakao_talk)), Week2 = c(mean(non_adopters_w2$t_non_kakao_talk), mean(adopters_w2$t_non_kakao_talk)))
+nktalk
+
+ggplot(nktalk, aes(x = Group, y = Week1, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 1",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+ggplot(nktalk, aes(x = Group, y = Week2, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 2",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+
+# non_kakao_story
+hist(kakao$t_non_kakao_story, breaks = 20)
+
+nkstory <- data.frame(Group = c("Non-adopters", "Adopters"), Week1 = c(mean(non_adopters_w1$t_non_kakao_story), mean(adopters_w1$t_non_kakao_story)), Week2 = c(mean(non_adopters_w2$t_non_kakao_story), mean(adopters_w2$t_non_kakao_story)))
+nkstory
+
+ggplot(nkstory, aes(x = Group, y = Week1, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 1",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+ggplot(nkstory, aes(x = Group, y = Week2, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 2",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+
+# non_kakao_game
+hist(kakao$t_non_kakao_game, breaks = 20)
+
+nkgame <- data.frame(Group = c("Non-adopters", "Adopters"), Week1 = c(mean(non_adopters_w1$t_non_kakao_game), mean(adopters_w1$t_non_kakao_game)), Week2 = c(mean(non_adopters_w2$t_non_kakao_game), mean(adopters_w2$t_non_kakao_game)))
+nkgame
+
+ggplot(nkgame, aes(x = Group, y = Week1, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 1",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+
+ggplot(nkgame, aes(x = Group, y = Week2, fill = Group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Mean Numbers - Week 2",
+       x = "Group",
+       y = "Mean Number") + theme_minimal()
+```
+
+
+## PSM Matching and DID Analysis
+```{r}
+# subset
+new.kakao <- subset(kakao, week==1)
+summary(new.kakao) # we noticed that when week==1, t_kakao_game only has the value 0.
+```
+
+
+## PSM Matching and DID Analysis (1): ratio=1, w/o replacement, w/o caliper
+```{r}
+# PSM Matching
+library(MatchIt)
+PSM1 <- matchit(tg ~ age+ income + education + gender + log(t_kakao_game+1) + log(t_kakao_talk+1) + log(t_kakao_story+1) + log(t_non_kakao_game+1) + log(t_non_kakao_talk+1) + log(t_non_kakao_story+1), data = new.kakao, method = "nearest", ratio = 1)
+plot(PSM1, type="hist")
+m1 <- get_matches(PSM1)
+id1 <- m1[c("panel_id", "weights")]
+id1
+
+# Define panel data frame
+Match1 <- merge(kakao, id1, by="panel_id") 
+m1.p <- pdata.frame(Match1, index=c("panel_id", "week")) 
+
+# Dummy Regression for each DV
+options(max.print=.Machine$integer.max)
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m1.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m1.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m1.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m1.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m1.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m1.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m1.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m1.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m1.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m1.p, model = "within", weights = weights))
+
+```
+
+
+## PSM Matching and DID Analysis (2): ratio = 1, w/o replacement, caliper = 0.05
+```{r}
+# PSM Matching
+PSM2 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", caliper = 0.05)
+plot(PSM2, type = "hist")
+m2 <- get_matches(PSM2)
+id2 <- m2[c("panel_id", "weights")]
+id2
+
+# Define panel data frame
+Match2 <- merge(kakao, id2, by = "panel_id") 
+m2.p <- pdata.frame(Match2, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m2.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m2.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m2.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m2.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m2.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m2.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m2.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m2.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m2.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m2.p, model = "within", weights = weights))
+```
+
+
+## PSM Matching and DID Analysis (3): ratio = 1, w/o replacement, caliper = 0.1
+```{r}
+# PSM Matching
+PSM3 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", caliper = 0.1)
+plot(PSM3, type = "hist")
+m3 <- get_matches(PSM3)
+id3 <- m3[c("panel_id", "weights")]
+id3
+
+# Define panel data frame
+Match3 <- merge(kakao, id3, by = "panel_id") 
+m3.p <- pdata.frame(Match3, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m3.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m3.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m3.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m3.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m3.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m3.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m3.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m3.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m3.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m3.p, model = "within", weights = weights))
+```
+
+
+## PSM Matching and DID Analysis (4): ratio = 1, w/o replacement, caliper = 0.2
+```{r}
+# PSM Matching
+PSM4 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", caliper = 0.2)
+plot(PSM4, type = "hist")
+m4 <- get_matches(PSM4)
+id4 <- m4[c("panel_id", "weights")]
+id4
+
+# Define panel data frame
+Match4 <- merge(kakao, id4, by = "panel_id") 
+m4.p <- pdata.frame(Match4, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m4.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m4.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m4.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m4.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m4.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m4.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m4.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m4.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m4.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m4.p, model = "within", weights = weights))
+```
+
+
+## PSM Matching and DID Analysis (5): ratio = 2, w/o replacement, caliper = 0.05
+```{r}
+# PSM Matching
+PSM5 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", ratio = 2, caliper = 0.05)
+plot(PSM5, type = "hist")
+m5 <- get_matches(PSM5)
+id5 <- m5[c("panel_id", "weights")]
+id5
+
+# Define panel data frame
+Match5 <- merge(kakao, id5, by = "panel_id") 
+m5.p <- pdata.frame(Match5, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m5.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m5.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m5.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m5.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m5.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m5.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m5.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m5.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m5.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m5.p, model = "within", weights = weights))
+```
+
+
+## PSM Matching and DID Analysis (6): ratio = 2, w/o replacement, caliper = 0.1
+```{r}
+# PSM Matching
+PSM6 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", ratio = 2, caliper = 0.1)
+plot(PSM6, type = "hist")
+m6 <- get_matches(PSM6)
+id6 <- m6[c("panel_id", "weights")]
+id6
+
+# Define panel data frame
+Match6 <- merge(kakao, id6, by = "panel_id") 
+m6.p <- pdata.frame(Match6, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m6.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m6.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m6.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m6.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m6.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m6.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m6.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m6.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m6.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m6.p, model = "within", weights = weights))
+```
+
+
+## PSM Matching and DID Analysis (7): ratio = 2, w/o replacement, caliper = 0.2
+```{r}
+# PSM Matching
+PSM7 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", ratio = 2, caliper = 0.2)
+plot(PSM7, type = "hist")
+m7 <- get_matches(PSM7)
+id7 <- m7[c("panel_id", "weights")]
+id7
+
+# Define panel data frame
+Match7 <- merge(kakao, id7, by = "panel_id") 
+m7.p <- pdata.frame(Match7, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m7.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m7.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m7.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m7.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m7.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m7.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m7.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m7.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m7.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m7.p, model = "within", weights = weights))
+```
+
+
+
+## PSM Matching and DID Analysis (8): ratio = 3, w/o replacement, caliper = 0.05
+```{r}
+# PSM Matching
+PSM8 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", ratio = 3, caliper = 0.05)
+plot(PSM8, type = "hist")
+m8 <- get_matches(PSM8)
+id8 <- m8[c("panel_id", "weights")]
+id8
+
+# Define panel data frame
+Match8 <- merge(kakao, id8, by = "panel_id") 
+m8.p <- pdata.frame(Match8, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m8.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m8.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m8.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m8.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m8.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m8.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m8.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m8.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m8.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m8.p, model = "within", weights = weights))
+```
+
+
+
+## PSM Matching and DID Analysis (9): ratio = 3, w/o replacement, caliper = 0.1
+```{r}
+# PSM Matching
+PSM9 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", ratio = 3, caliper = 0.1)
+plot(PSM9, type = "hist")
+m9 <- get_matches(PSM9)
+id9 <- m9[c("panel_id", "weights")]
+id9
+
+# Define panel data frame
+Match9 <- merge(kakao, id9, by = "panel_id") 
+m9.p <- pdata.frame(Match9, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m9.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m9.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m9.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m9.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m9.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m9.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m9.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m9.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m9.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m9.p, model = "within", weights = weights))
+```
+
+
+
+## PSM Matching and DID Analysis (10): ratio = 3, w/o replacement, caliper = 0.2
+```{r}
+# PSM Matching
+PSM10 <- matchit(tg ~ age + income + education + gender + log(t_kakao_game + 1) + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = new.kakao, method = "nearest", ratio = 3, caliper = 0.2)
+plot(PSM10, type = "hist")
+m10 <- get_matches(PSM10)
+id10 <- m10[c("panel_id", "weights")]
+id10
+
+# Define panel data frame
+Match10 <- merge(kakao, id10, by = "panel_id") 
+m10.p <- pdata.frame(Match10, index = c("panel_id", "week"))
+
+# Dummy Regression
+summary(lm(log(t_non_kakao_game + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) +log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m10.p, weights = weights))
+summary(lm(log(t_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m10.p, weights = weights))
+summary(lm(log(t_non_kakao_talk + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m10.p, weights = weights))
+summary(lm(log(t_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m10.p, weights = weights))
+summary(lm(log(t_non_kakao_story + 1) ~ as.factor(panel_id) + as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m10.p, weights = weights))
+
+# Fixed-effect Regression
+summary(plm(log(t_non_kakao_game + 1)~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m10.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m10.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_talk + 1) ~ as.factor(week) + ii + log(t_non_kakao_game + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_game + 1) + log(t_non_kakao_story + 1), data = m10.p, model = "within", weights = weights))
+summary(plm(log(t_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_non_kakao_game + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_story + 1), data = m10.p, model = "within", weights = weights))
+summary(plm(log(t_non_kakao_story + 1) ~ as.factor(week) + ii + log(t_kakao_talk + 1) + log(t_kakao_story + 1) + log(t_kakao_game + 1) + log(t_non_kakao_talk + 1) + log(t_non_kakao_game + 1), data = m10.p, model = "within", weights = weights))
+```
+
+
+
+
+
+
+
+
+
+
